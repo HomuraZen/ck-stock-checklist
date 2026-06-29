@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CK Monthly Stock Check — A'rest</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif; background: #f4f4f4; color: #1a1a1a; -webkit-font-smoothing: antialiased; }
+
+    .container { max-width: 620px; margin: 0 auto; padding-bottom: 48px; }
+
+    /* Header */
+    .header { background: #111; color: #fff; padding: 28px 20px 24px; text-align: center; }
+    .header h1 { font-size: 17px; font-weight: 600; letter-spacing: 0.6px; }
+    .header p { font-size: 12px; color: #888; margin-top: 5px; letter-spacing: 0.3px; }
+
+    /* Meta fields */
+    .meta { background: #fff; padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; border-bottom: 1px solid #e8e8e8; }
+    .field label { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #888; margin-bottom: 7px; }
+    .field input { width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 7px; font-size: 15px; color: #1a1a1a; background: #fff; transition: border-color 0.15s; }
+    .field input:focus { outline: none; border-color: #111; }
+    .field input[readonly] { background: #f8f8f8; color: #777; cursor: default; }
+    .field input.error { border-color: #e53935; }
+
+    /* Supplier sections */
+    .section { background: #fff; margin-top: 10px; }
+    .section-header { padding: 9px 20px; background: #f0f0f0; border-top: 1px solid #e4e4e4; border-bottom: 1px solid #e4e4e4; }
+    .section-header span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.9px; color: #666; }
+
+    /* Item rows */
+    .item-row { display: flex; align-items: center; padding: 9px 20px; border-bottom: 1px solid #f2f2f2; gap: 10px; }
+    .item-row:last-child { border-bottom: none; }
+    .item-no { font-size: 11px; color: #bbb; width: 22px; flex-shrink: 0; text-align: right; }
+    .item-name { flex: 1; font-size: 14px; line-height: 1.3; }
+    .item-qty { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .item-qty input { width: 70px; padding: 7px 8px; border: 1.5px solid #ddd; border-radius: 7px; font-size: 14px; text-align: center; color: #1a1a1a; transition: border-color 0.15s; }
+    .item-qty input:focus { outline: none; border-color: #111; }
+    .item-qty input.filled { border-color: #ccc; background: #fafff8; }
+    .item-unit { font-size: 11px; color: #aaa; width: 36px; }
+
+    /* Warning */
+    .warning-box { margin: 10px 20px 0; padding: 11px 14px; background: #fff8e1; border: 1px solid #ffe082; border-radius: 7px; font-size: 13px; color: #6d4c00; display: none; }
+
+    /* Submit */
+    .submit-area { padding: 20px 20px 0; }
+    .submit-btn { width: 100%; padding: 15px; background: #111; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; letter-spacing: 0.3px; transition: background 0.15s; }
+    .submit-btn:hover { background: #333; }
+    .submit-btn:disabled { background: #999; cursor: not-allowed; }
+
+    /* Overlay */
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); align-items: center; justify-content: center; z-index: 100; }
+    .overlay.show { display: flex; }
+    .overlay-card { background: #fff; border-radius: 14px; padding: 40px 28px; text-align: center; max-width: 290px; width: calc(100% - 40px); }
+    .spinner { width: 30px; height: 30px; border: 3px solid #eee; border-top-color: #111; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 18px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .overlay-icon { font-size: 36px; margin-bottom: 14px; }
+    .overlay-card h2 { font-size: 19px; font-weight: 600; margin-bottom: 6px; }
+    .overlay-card p { font-size: 13px; color: #666; line-height: 1.5; }
+
+    @media (max-width: 380px) {
+      .meta { grid-template-columns: 1fr; }
+      .item-qty input { width: 58px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>A'rest Central Kitchen</h1>
+    <p>Monthly Stock Checklist &nbsp;·&nbsp; End of month</p>
+  </div>
+
+  <form id="stockForm" novalidate>
+
+    <div class="meta">
+      <div class="field">
+        <label for="staffName">Your name *</label>
+        <input type="text" id="staffName" placeholder="Full name" autocomplete="name" required>
+      </div>
+      <div class="field">
+        <label for="date">Date</label>
+        <input type="text" id="date" readonly>
+      </div>
+    </div>
+
+    <div id="itemsContainer"></div>
+
+    <div class="warning-box" id="warningBox"></div>
+
+    <div class="submit-area">
+      <button type="submit" class="submit-btn" id="submitBtn">Submit Stock Count</button>
+    </div>
+
+  </form>
+</div>
+
+<!-- Overlay -->
+<div class="overlay" id="overlay">
+  <div class="overlay-card">
+    <div id="overlaySpinner" class="spinner"></div>
+    <div id="overlayIcon" class="overlay-icon" style="display:none"></div>
+    <h2 id="overlayTitle">Submitting...</h2>
+    <p id="overlayMsg">Please wait, do not close this page.</p>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────
+const APPS_SCRIPT_URL = 'PASTE_YOUR_APPS_SCRIPT_URL_HERE';
+// ─────────────────────────────────────────────────────────
+
+const ITEMS = [
+  // [no, name, supplier, unit]
+  [1,  'Handmade noodles',           'HH',                 ''],
+  [2,  'Tempura prawn',              'Dynamic',             ''],
+  [3,  'Bread crumbs',               'Dynamic',             'kg'],
+  [4,  'Japanese mayonnaise',        'Dynamic',             ''],
+  [5,  'Chilli oil',                 'Dynamic',             'ctn'],
+  [6,  'Corn starch',                'Best Marketing',      'ctn'],
+  [7,  'Potato powder',              'Best Marketing',      'ctn'],
+  [8,  'Tepung gandum',              'Best Marketing',      'ctn'],
+  [9,  'Tepung ubi kayu',            'Best Marketing',      'ctn'],
+  [10, 'Garam halus',                'Best Marketing',      'ctn'],
+  [11, 'Chilli powder',              'Best Marketing',      'kg'],
+  [12, 'Turmeric powder',            'Best Marketing',      'kg'],
+  [13, 'Aromat seasoning powder',    'Best Marketing',      'ctn'],
+  [14, 'Knorr chicken stock',        'Best Marketing',      'pk'],
+  [15, 'Knorr pesti sedap',          'Best Marketing',      'ctn'],
+  [16, 'Pure tomato Heinz',          'Best Marketing',      'tin'],
+  [17, 'Pronto tomato',              'Best Marketing',      'tin'],
+  [18, 'Sesami oil',                 'CGK',                 'bottles'],
+  [19, 'Kimball BBQ sauce',          'CGK',                 'ctn'],
+  [20, 'Paprika powder',             'CGK',                 'pkts'],
+  [21, 'Black pepper powder',        'CGK',                 'pkts'],
+  [22, 'TST black vinegar',          'CGK',                 'bottles'],
+  [23, 'Caramal masakan',            'CGK',                 'bottles'],
+  [24, 'Panda oyster sauce',         'CGK',                 'bottles'],
+  [25, 'LKK soya sauce',             'CGK',                 'bottles'],
+  [26, 'Smoky Japanese BBQ sauce',   'DKSH',                'ctn'],
+  [27, 'Mentai sauce',               'DKSH',                'ctn'],
+  [28, 'Tartar sauce',               'DKSH',                'pkts'],
+  [29, 'Baking powder',              'DKSH',                'ctn'],
+  [30, 'Hot spicy dressing',         'DKSH',                'ctn'],
+  [31, 'HM plastic bag 6x9',         'Unique',              'pkt'],
+  [32, 'HM plastic bag 7x10',        'Unique',              'pkts'],
+  [33, 'HD plastic bag 20x30',       'Unique',              'pkts'],
+  [34, 'Garbage bag XL',             'Unique',              'pkts'],
+  [35, 'Floor cleaner',              'Unique',              'bottle'],
+  [36, 'Dishwash liquid',            'Unique',              'bottles'],
+  [37, 'Degreaser (floor clean)',    'Unique',              'bottles'],
+  [38, 'Cleanwrap',                  'Unique',              ''],
+  [39, 'Baking paper',               'Unique',              ''],
+  [40, 'Chicken chop',               'T&T / Chaikee',       ''],
+  [41, 'Chicken wing',               'T&T / Chaikee',       ''],
+  [42, 'Lala',                       'T&T / Chaikee',       'ctn'],
+  [43, 'Chicken breast',             'G Daily',             'kg'],
+  [44, 'Mutton cube',                'G Daily',             'kg'],
+  [45, 'Angus beef cube',            'G Daily',             ''],
+  [46, 'Minced beef',                'G Daily',             'kg'],
+  [47, 'Minced chicken',             'G Daily',             ''],
+  [48, 'Cooking oil',                'G Daily',             'tong'],
+  [49, 'Salmon',                     'Deepsea',             ''],
+  [50, 'Sotong',                     'Deepsea / Chaikee',   ''],
+  [51, 'Duck',                       'Deepsea / Chaikee',   ''],
+  [52, 'Prawn',                      'Deepsea / Chaikee',   'ctn'],
+  [53, 'Barilla N5 spaghetti',       'CGK / Tri Apex',      'ctn'],
+  [54, 'Beef pepperoni',             'BGS',                 'pkt'],
+  [55, 'Chicken pepperoni',          'BGS',                 'pkts'],
+];
+
+// ── Build supplier groups in original order ──
+const groupOrder = [];
+const groups = {};
+ITEMS.forEach(([no, name, supplier, unit]) => {
+  if (!groups[supplier]) { groups[supplier] = []; groupOrder.push(supplier); }
+  groups[supplier].push([no, name, supplier, unit]);
+});
+
+// ── Render item sections ──
+const container = document.getElementById('itemsContainer');
+groupOrder.forEach(supplier => {
+  const section = document.createElement('div');
+  section.className = 'section';
+  section.innerHTML = `<div class="section-header"><span>${supplier}</span></div>`;
+
+  groups[supplier].forEach(([no, name, , unit]) => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `
+      <span class="item-no">${no}</span>
+      <span class="item-name">${name}</span>
+      <div class="item-qty">
+        <input type="number" id="qty_${no}" min="0" step="0.01" placeholder="0" inputmode="decimal">
+        <span class="item-unit">${unit}</span>
+      </div>`;
+    section.appendChild(row);
+  });
+
+  container.appendChild(section);
+});
+
+// ── Auto-fill date ──
+const now = new Date();
+document.getElementById('date').value = now.toLocaleDateString('en-MY', {
+  day: '2-digit', month: 'long', year: 'numeric'
+});
+
+// ── Live border feedback on qty inputs ──
+ITEMS.forEach(([no]) => {
+  const input = document.getElementById(`qty_${no}`);
+  input.addEventListener('input', () => {
+    input.classList.toggle('filled', input.value !== '');
+  });
+});
+
+// ── Submit logic ──
+let warnedEmpty = false;
+
+document.getElementById('stockForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  // Validate name
+  const nameInput = document.getElementById('staffName');
+  const staffName = nameInput.value.trim();
+  if (!staffName) {
+    nameInput.classList.add('error');
+    nameInput.focus();
+    nameInput.addEventListener('input', () => nameInput.classList.remove('error'), { once: true });
+    return;
+  }
+
+  // Check for empty qty fields
+  const emptyNos = ITEMS.filter(([no]) => document.getElementById(`qty_${no}`).value === '').map(([no]) => no);
+  const warningBox = document.getElementById('warningBox');
+  const submitBtn  = document.getElementById('submitBtn');
+
+  if (emptyNos.length > 0 && !warnedEmpty) {
+    warnedEmpty = true;
+    warningBox.textContent = `${emptyNos.length} item(s) have no quantity entered. If that's correct, tap Submit again to confirm.`;
+    warningBox.style.display = 'block';
+    submitBtn.textContent = `Confirm & Submit (${emptyNos.length} items blank)`;
+    warningBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  warningBox.style.display = 'none';
+
+  // Collect payload
+  const items = ITEMS.map(([no, name, supplier, unit]) => ({
+    no, name, supplier, unit,
+    qty: document.getElementById(`qty_${no}`).value || ''
+  }));
+
+  const payload = {
+    staffName,
+    date: document.getElementById('date').value,
+    items
+  };
+
+  // Show loading overlay
+  const overlay = document.getElementById('overlay');
+  overlay.classList.add('show');
+
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    // Success (no-cors: can't read response — assume success if no network error)
+    showOverlayResult('✓', 'Submitted!', `Thank you, ${staffName.split(' ')[0]}. Stock count recorded.`);
+    submitBtn.disabled = true;
+
+  } catch (err) {
+    showOverlayResult('✕', 'Failed to submit', 'Check your internet connection and try again.');
+    setTimeout(() => overlay.classList.remove('show'), 3500);
+    warnedEmpty = false;
+  }
+});
+
+function showOverlayResult(icon, title, msg) {
+  document.getElementById('overlaySpinner').style.display = 'none';
+  const iconEl = document.getElementById('overlayIcon');
+  iconEl.textContent = icon;
+  iconEl.style.display = 'block';
+  document.getElementById('overlayTitle').textContent = title;
+  document.getElementById('overlayMsg').textContent = msg;
+}
+</script>
+</body>
+</html>
